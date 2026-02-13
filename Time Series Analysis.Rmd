@@ -1,0 +1,1005 @@
+---
+title: "Time Series Analysis of Confirmed Malaria Cases Using ARIMA, SARIMA and ARIMAX Models"
+author: "TCHAKONDO Samadou"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    number_sections: true
+    theme: cosmo
+    highlight: tango
+  word_document: default
+  pdf_document:
+    latex_engine: xelatex
+---
+# **Executive Summary**
+
+This analysis evaluates the temporal dynamics of monthly confirmed malaria cases collected from a health structure in Togo between 2022 and 2024.
+
+Using ARIMA, SARIMA, and ARIMAX models, we identified a strong seasonal pattern with annual periodicity. The SARIMA model demonstrated superior performance and was used to generate forecasts for 2025–2026.
+
+The results highlight the importance of incorporating seasonality in epidemiological time series modelling for improved predictive accuracy.
+
+
+
+# **Background and Study Objectives**
+
+## **Data Description**
+
+The data used in this analysis originate from the malaria epidemiological surveillance system and cover the period from January 2022 to December 2024. They are derived from real-world data collected within a health structure in Togo.
+
+The observations are organized as monthly time series data, which allows the application of time series analytical methods.
+
+The primary dependent variable is:
+
+Total_confirmed_cases: the total monthly number of biologically confirmed malaria cases.
+
+This variable represents a discrete time series that may exhibit:
+
+Temporal dependence
+
+Annual seasonality
+
+Potential non-stationarity
+
+
+
+## **Objective of the Time Series Analysis**
+
+The primary objective of this time series analysis is to model the temporal dynamics of confirmed malaria cases and identify the most appropriate model for generating forecasts for 2025–2026.
+
+More specifically, the analysis aims to:
+
+- Examine the temporal structure of the series (trend, seasonality, autocorrelation);
+
+- Test stationarity and apply necessary transformations;
+
+- Identify and estimate ARIMA, SARIMA, and ARIMAX models;
+
+- Compare models using information criteria (AIC, BIC);
+
+- Select the best-performing forecasting model;
+
+- Generate monthly forecasts of confirmed malaria cases for 2025–2026.
+
+
+
+
+# **Data Preparation and Initial Exploration**
+
+
+## **R Markdown Configuration**
+```{r setup, include=TRUE, warning=FALSE, message=FALSE}
+# Load required libraries
+library(haven)      # Import SPSS data
+library(dplyr)      # Data manipulation
+library(tidyverse)  # Visualization and tidy tools
+library(forecast)   # ARIMA / SARIMA / ARIMAX models + Acf() and Pacf()
+library(tseries)    # Augmented Dickey-Fuller (ADF) test
+```
+  
+## **Data Import and Initial Inspection**
+```{r data-import}
+# Import the dataset (SPSS format) from the project data folder
+data <- read_sav("data/ARIMA.sav")
+
+# Check the object structure and data type
+class(data)
+
+# Preview the first rows of the dataset
+head(data)
+```
+### **Interpretation**
+
+This section initializes the R environment by loading the necessary libraries required for data import, manipulation, visualization, and time series modelling.
+
+- haven is used to import SPSS data files.
+
+- dplyr and tidyverse support data wrangling and visualization.
+
+- forecast provides functions for ARIMA-family modelling and diagnostics.
+
+- tseries is used to perform the Augmented Dickey–Fuller test for stationarity assessment.
+  
+  
+  
+  
+# **Time Variable Construction**
+
+## **Creation of the Date Variable**
+
+In time series analysis, it is essential to define a properly structured temporal variable to preserve the chronological ordering of observations. Since the dataset is organized at a monthly scale, a Date variable is constructed using the available year and month information.
+
+Each monthly observation is assigned to the first day of the corresponding month. This conventional approach ensures proper representation of monthly periodicity and compatibility with visualization and time series analysis tools in R.
+
+The creation of the temporal variable facilitates:
+
+Graphical representation using calendar-based plotting methods
+
+Consistency between the dataset structure and time series modelling techniques
+
+Clear temporal interpretation of results
+
+A verification step is performed to confirm that the new variable is correctly recognized as a Date object.
+
+```{r create-date}
+# Create Date variable from Year and Month
+data <- data %>%
+  mutate(
+    Date = as.Date(paste(Année, Mois, "01", sep = "-"))
+  )
+
+# Verify Date class
+class(data$Date)
+head(data$Date)
+```
+
+### **Interpretation**
+
+The output confirms that the Date variable is correctly stored as a Date object in R, ensuring compatibility with time-based plotting and chronological data manipulation.
+
+
+
+
+# **Definition of the Monthly Time Series Object**
+
+After constructing the temporal variable, the dependent variable Total_confirmed_cases is transformed into a structured time series object (ts).
+
+This step is crucial because ARIMA-family models require data formatted as time series objects.
+
+The series is defined as:
+
+- Monthly frequency (12 observations per year)
+
+- Covering January 2022 to December 2024
+
+This specification allows R to incorporate seasonal structure automatically.
+
+```{r create-ts}
+# Define monthly time series
+ts_confirmed <- ts(
+  data$Total_cas_confirmés,
+  start = c(2022, 1),
+  end   = c(2024, 12),
+  frequency = 12
+)
+
+ts_confirmed
+```
+
+## **Interpretation**
+
+The output confirms that the data are now structured as a monthly time series with 36 observations. This format enables:
+
+- Seasonal decomposition
+
+- Stationarity testing
+
+- ARIMA/SARIMA model estimation
+
+- Forecast generation
+
+
+
+
+# **Exploratory Time Series Analysis**
+
+Before formal modelling, an exploratory analysis is conducted to understand the underlying behaviour of the series.
+
+The objectives of the exploratory analysis are to:
+
+- Detect potential long-term trends
+
+- Identify recurring seasonal patterns
+
+- Examine irregular fluctuations or structural breaks
+
+- Assess variance stability
+
+Two complementary visualization approaches are used:
+
+Direct plotting of the ts object
+
+Calendar-based visualization using the Date variable
+
+
+## **Time Series Plot**
+```{r ts-plot}
+plot.ts(
+  ts_confirmed,
+  main = "Monthly Confirmed Malaria Cases (2022–2024)",
+  xlab = "Year (monthly data)",
+  ylab = "Number of Confirmed Cases",
+  col  = "violetred3",
+  lwd  = 3)
+```
+
+## **Calendar-Based Visualization**
+```{r}
+ggplot(data, aes(x = Date, y = Total_cas_confirmés)) +
+  geom_line(color = "steelblue", linewidth = 1.2) +
+  labs(
+    title = "Monthly Confirmed Malaria Cases (2022–2024)",
+    x = "Date",
+    y = "Number of Confirmed Cases"
+  ) +
+  theme_minimal()
+```
+
+### **Interpretation of the Exploratory Analysis**
+
+The visual inspection of the monthly confirmed malaria cases from 2022 to 2024 reveals substantial month-to-month variability. Recurrent peaks are observed at similar periods across years, indicating the presence of a strong annual seasonal component.
+
+No clear monotonic linear trend (increasing or decreasing) is observed over the entire study period, suggesting that long-term structural changes are limited. However, the magnitude of seasonal fluctuations appears considerable, justifying the consideration of models that explicitly incorporate seasonal dynamics.
+
+These preliminary findings support the use of SARIMA-type models for subsequent analysis.
+
+
+
+
+# **Time Series Decomposition**
+
+Time series decomposition is an essential exploratory step that helps to better understand the internal structure of the observed series. It separates the original time series into distinct components typically interpreted as:
+
+**- A trend component**, representing long-term evolution;
+
+**- A seasonal component**, reflecting recurring periodic fluctuations;
+
+**- A residual (irregular) component**, capturing random variability not explained by trend or seasonality.
+
+This step is particularly important in ARIMA modelling, as visual identification of trend and seasonality helps assess whether the series may violate stationarity assumptions.
+
+
+
+## **Additive Decomposition**
+
+First, an additive decomposition is applied to the monthly confirmed malaria cases.
+
+The additive model assumes that the observed series can be expressed as:
+ 
+              
+               Xt = Tt + St + Rt
+               
+where:
+
+- Tt represents the trend component,
+
+- St represents the seasonal component,
+
+- Rt represents the residual component.
+
+Additive decomposition is appropriate when the magnitude of seasonal fluctuations remains approximately constant over time.
+```{r decomposition-additive}
+# Additive decomposition
+decomp_additive <- decompose(ts_confirmed, type = "additive")
+plot(decomp_additive)
+
+# Residual diagnostics
+par(mfrow = c(1,2))
+plot.ts(decomp_additive$random, main = "Residuals")
+hist(decomp_additive$random, breaks = 25, freq = FALSE, main = "Histogram")
+```
+
+### **Interpretation of the Additive Decomposition**
+
+The additive decomposition highlights three distinct components.
+
+**The trend component** exhibits moderate fluctuations without a persistent upward or downward trajectory, confirming the absence of a strong long-term structural trend during the study period.
+
+**The seasonal component** displays a regular and reproducible annual pattern with relatively stable amplitude. This indicates that seasonal effects add a relatively constant magnitude to the series across years.
+
+**The residual component** appears centered around zero and does not show obvious systematic structure, suggesting that the additive model adequately captures the main temporal features of the series.
+
+
+
+## **Multiplicative Decomposition**
+
+Next, a multiplicative decomposition is performed to evaluate whether seasonal variation changes proportionally with the level of the series.
+
+In the multiplicative framework, the series is assumed to follow:
+
+                   Xt = Tt + St + Rt
+                
+
+Multiplicative decomposition is appropriate when seasonal fluctuations increase or decrease proportionally with the series level, implying heteroscedastic behavior.
+```{r decomposition-multiplicative}
+# Multiplicative decomposition
+decomp_multi <- decompose(ts_confirmed, type = "multiplicative")
+plot(decomp_multi)
+
+# Residual diagnostics
+par(mfrow = c(1,2))
+plot.ts(decomp_multi$random, main="Residuals", ylab="")
+hist(decomp_multi$random, breaks = 25, freq = FALSE, main = "Histogram")
+```
+
+### **Interpretation of the Multiplicative Decomposition**
+
+The multiplicative decomposition assumes that seasonal amplitude varies proportionally with the series level. In this case, although seasonality is clearly detectable, the residuals appear more heterogeneous compared to the additive decomposition.
+
+The comparison between the two approaches suggests that the additive decomposition provides a better representation of the data. This indicates that seasonal effects primarily operate in an additive rather than proportional manner.
+
+
+
+# **Stationarity and Temporal Dependence**
+
+Time series analysis relies on the fundamental assumption of stationarity. A time series is considered stationary when its key statistical properties remain constant over time. In practice, this implies:
+
+- A constant mean (no systematic trend);
+
+- A constant variance;
+
+- A stable temporal dependence structure, without persistent unmodelled autocorrelation.
+
+In epidemiological data, such as monthly confirmed malaria cases, these assumptions are rarely satisfied a priori. Therefore, it is essential to formally assess stationarity and examine temporal dependence before fitting ARIMA-type models.
+
+
+## **Augmented Dickey–Fuller (ADF) Test**
+
+The Augmented Dickey–Fuller (ADF) test is used to assess the presence of a unit root, which indicates non-stationarity.
+
+The hypotheses are defined as:
+
+**- Null hypothesis (H₀):** The series is non-stationary (contains a unit root).
+
+**- Alternative hypothesis (H₁):** The series is stationary.
+
+Rejection of the null hypothesis at the conventional 5% significance level suggests that the series can be considered stationary in level, or stationary after differencing if required.
+```{r}
+# Augmented Dickey-Fuller test (ADF)
+adf.test(ts_confirmed)
+```
+
+### **Interpretation of the ADF Test**
+
+The Augmented Dickey–Fuller test yields a test statistic of −3.56 with a p-value of 0.0499. At the 5% significance level, the null hypothesis of non-stationarity is rejected.
+
+This result suggests that the series may be considered stationary in level. However, given that the rejection is marginal and strong annual seasonality has been observed, seasonal differencing remains methodologically justified when estimating SARIMA models.
+
+
+
+## **Autocorrelation and Partial Autocorrelation Analysis**
+
+Beyond formal stationarity testing, examining the temporal dependence structure is a key step in the **Box–Jenkins methodology**.
+
+**- The Autocorrelation Function (ACF)** measures the correlation between observations and their past values at different lags.
+
+**- The Partial Autocorrelation Function (PACF)** measures correlation at a given lag after controlling for intermediate lags.
+
+Joint interpretation of the ACF and PACF helps to:
+
+- Detect seasonal structure;
+
+- Identify autoregressive (AR) components;
+
+- Identify moving average (MA) components;
+
+- Guide ARIMA and SARIMA model specification.
+```{r}
+#ACF & PACF
+par(mfrow = c(1,2))
+Acf(ts_confirmed, main = "ACF of Original Series")
+Pacf(ts_confirmed, main = "PACF of Original Series")
+```
+
+### **Interpretation of ACF and PACF**
+
+The ACF exhibits a gradual decay and prominent spikes at lags that are multiples of 12, indicating strong annual seasonal dependence.
+
+The PACF shows a relatively sharp cutoff after the first few lags, suggesting limited short-term autoregressive structure.
+
+This pattern is consistent with:
+
+- A non-seasonal moving average component;
+
+- A seasonal autoregressive component;
+
+These findings support the consideration of SARIMA models incorporating seasonal dynamics.
+
+
+
+## **Lag-1 Scatterplot**
+
+Autocorrelation can also be visually explored using a lag-1 scatterplot, where consecutive observations are plotted against each other.
+```{r}
+plot(ts_confirmed[1:35], ts_confirmed[2:36])
+```
+### **Interpretation of the Lag-1 Scatterplot**
+
+The scatterplot of consecutive observations (Xt versus Xt+1) does not reveal a clear linear structure or strong systematic alignment along a diagonal axis. The points appear relatively dispersed.
+
+This suggests that immediate linear dependence (lag 1) is not dominant. However, visual inspection alone is insufficient to conclude the absence of autocorrelation. Formal evaluation through ACF and PACF remains the appropriate method for assessing temporal dependence.
+
+ 
+ 
+ 
+# **ARIMA Model Identification and Estimation**
+
+## **The ARIMA (p, d, q) Model**
+
+The ARIMA (AutoRegressive Integrated Moving Average) model is widely used for the analysis and forecasting of univariate time series. It is particularly suitable for series exhibiting temporal dependence and that are stationary, or can be rendered stationary through differencing.
+
+An ARIMA model is defined by three parameters 
+(p,d,q), each representing a specific component of the series dynamics.
+
+
+**- Autoregressive Component: AR(p)**
+
+The autoregressive component reflects the dependence of the current value of the series on its own past values.
+
+In an AR(p) model, the observation at time 
+t is expressed as a linear combination of the previous p observations.
+
+Thus, the series exhibits temporal memory, where past values directly influence future values.
+
+The parameter: p = number of autoregressive lags included in the model.
+
+
+
+
+
+
+**- Integrated Component: I(d)**
+
+The integrated component corresponds to the differencing process applied to the series to achieve stationarity.
+
+Differencing removes trends and stabilizes the mean.
+
+The parameter:
+
+**d = 0:** series is stationary in level
+
+**d = 1:** first-order differencing
+
+**d = 2:** second-order differencing
+
+The choice of d is typically guided by graphical inspection and formal stationarity tests such as the Augmented Dickey–Fuller test.
+
+
+
+**- Moving Average Component: MA(q)**
+
+The moving average component models the dependence of the current observation on past error terms (random shocks).
+
+In an MA(q) model, the observation at time t depends on the previous q forecast errors.
+
+The parameter: q = number of moving average lags included.
+
+This component captures short-term random fluctuations not explained by the autoregressive structure.
+
+
+
+Model Notation
+
+An ARIMA model is written as:
+
+                 ARIMA(p,d,q)
+
+where:
+
+- p= autoregressive order   
+
+- d = differencing order
+
+- q = moving average order
+
+Identification of p and q is primarily based on ACF and PACF analysis, while d is determined from stationarity assessment.
+
+
+**Role of ARIMA in This Study**
+
+In this analysis, the non-seasonal ARIMA model serves as a baseline reference model, describing the temporal dynamics of confirmed malaria cases without explicitly incorporating seasonality.
+
+It provides a comparison benchmark for more complex models such as SARIMA and ARIMAX.
+
+
+
+## **Non-Seasonal ARIMA Model (Baseline)**
+
+The non-seasonal ARIMA model is estimated automatically using information criteria to determine the optimal combination of autoregressive, differencing, and moving average terms.
+```{r}
+# Non-seasonal ARIMA model
+model_auto_no_seasonal <- auto.arima(
+  ts_confirmed,
+  seasonal = FALSE,
+  stepwise = FALSE,
+  approximation = FALSE
+)
+
+summary(model_auto_no_seasonal)
+```
+
+### **Interpretation of the Non-Seasonal ARIMA Model**
+
+The automatically selected model is ARIMA(1,0,0) with a non-zero mean.
+
+The positive and statistically significant autoregressive coefficient indicates moderate dependence between consecutive observations.
+
+However, although the model captures part of the short-term temporal dependence, the information criterion (AIC = 457.5) remains relatively high, suggesting suboptimal fit.
+
+This likely reflects the absence of an explicit seasonal component, despite strong evidence of annual seasonality in the data.
+
+
+
+## **Diagnostic Analysis of the Non-Seasonal ARIMA Model**
+
+After model estimation, residual diagnostics are performed to assess model adequacy.
+
+A well-specified ARIMA model should produce residuals that behave as white noise, meaning:
+
+- No residual autocorrelation
+
+- Constant variance
+
+- Zero mean
+
+- No systematic pattern
+```{r}
+checkresiduals(model_auto_no_seasonal)
+
+acf(model_auto_no_seasonal$residuals,
+    main = "ACF of ARIMA Residuals")
+
+pacf(model_auto_no_seasonal$residuals,
+     main = "PACF of ARIMA Residuals")
+
+hist(model_auto_no_seasonal$residuals,
+     main = "Histogram of ARIMA Residuals",
+     xlab = "Residuals")
+```
+
+### **Interpretation of Residual Diagnostics**
+
+Residual diagnostics indicate no significant residual autocorrelation.
+
+The Ljung–Box test yields a p-value of 0.66, suggesting that the residuals do not significantly deviate from white noise behavior.
+
+Therefore, from a statistical standpoint, the model appears adequately specified.
+
+However, despite statistical validity, the model remains substantively limited because it fails to explicitly model the strong seasonal structure observed in the original series.
+
+This justifies proceeding to seasonal modelling using SARIMA.
+
+
+
+
+# **Seasonal ARIMA (SARIMA) Modelling**
+
+Monthly confirmed malaria cases are likely to exhibit annual seasonality. Therefore, a Seasonal AutoRegressive Integrated Moving Average (SARIMA) model is estimated.
+
+The SARIMA model extends the classical ARIMA framework by explicitly incorporating seasonal components, allowing the capture of recurrent periodic fluctuations observed in the time series.
+
+Model identification and estimation follow the Box–Jenkins procedure, which relies on:
+
+- Stationarity assessment
+
+- ACF and PACF analysis
+
+- Information criteria comparison
+
+After estimation, residual diagnostics are examined to verify the overall adequacy of the model before using it for forecasting.
+
+
+**Formulation of the SARIMA Model**
+
+A SARIMA model is denoted as:
+
+             SARIMA(p,d,q)(P,D,Q)s
+
+where:
+
+- p,d,q = non-seasonal autoregressive, differencing, and moving average orders
+
+- P,D,Q = seasonal autoregressive, differencing, and moving average orders
+
+- s = seasonal periodicity (for monthly data,s=12)
+
+This model simultaneously captures:
+
+- Short-term (non-seasonal) dynamics
+
+- Long-term seasonal patterns
+
+
+
+## **Automatic Identification - SARIMA Model**
+```{r}
+#SARIMA
+model_auto_seasonal <- auto.arima(
+  ts_confirmed,
+  seasonal = TRUE,
+  stepwise = FALSE,
+  approximation = FALSE
+)
+
+summary(model_auto_seasonal)
+```
+
+### **Interpretation of the Selected SARIMA Model**
+
+The automatically selected model is:
+
+            SARIMA(0,0,1)(1,1,0)12
+            
+This specification includes:
+
+- A non-seasonal moving average component
+
+- seasonal autoregressive component
+
+- Seasonal differencing of order 1
+
+The inclusion of seasonal differencing confirms the presence of strong annual seasonality.
+
+The information criteria:
+
+- AIC = 309.8
+
+- BIC = 313.3
+
+are substantially lower than those of the non-seasonal ARIMA model (AIC = 457.5), indicating a marked improvement in model fit.
+
+Additionally, performance metrics such as RMSE and MAPE confirm superior predictive performance.
+
+These findings strongly support the relevance of explicitly modelling seasonality.
+
+
+
+## **Residual Diagnostics of the SARIMA Model**
+
+Model adequacy is assessed through residual diagnostics. A well-specified SARIMA model should produce residuals behaving as white noise.
+
+```{r}
+checkresiduals(model_auto_seasonal)
+
+acf(model_auto_seasonal$residuals,
+    main = "ACF of SARIMA Residuals")
+pacf(model_auto_seasonal$residuals,
+     main = "PACF of SARIMA Residuals")
+hist(model_auto_seasonal$residuals,
+     main = "Histogram of SARIMA Residuals",
+     xlab = "Residuals")
+
+plot(model_auto_seasonal)
+```
+
+### **Interpretation of Residual Diagnostics**
+
+The residual diagnostics indicate no significant remaining autocorrelation. The Ljung–Box test yields a p-value of 0.96, suggesting failure to reject the null hypothesis of independence.
+
+The residual ACF and PACF do not reveal any systematic pattern, and the residual distribution appears approximately symmetric around zero.
+
+These results confirm that the SARIMA model adequately captures both short-term and seasonal dynamics of confirmed malaria cases.
+
+
+
+
+# **ARIMAX Modelling (ARIMA with Exogenous Variables)**
+
+To extend the modelling framework beyond purely univariate approaches, an ARIMAX (AutoRegressive Integrated Moving Average with eXogenous variables) model is estimated.
+
+The ARIMAX model extends the ARIMA framework by incorporating external explanatory variables that may influence the temporal dynamics of confirmed malaria cases.
+
+In this study, the exogenous variables correspond to climatic factors:
+
+- Precipitation
+
+- Temperature
+
+- Humidity
+
+The influence of these variables on malaria transmission is well documented in the epidemiological literature.
+
+To ensure numerical stability and facilitate comparison of relative effects, all exogenous variables are standardized prior to estimation.
+
+The primary objective of the ARIMAX approach is to assess whether incorporating external climatic information significantly improves model fit and predictive performance compared to purely univariate models (ARIMA and SARIMA).
+
+
+
+**Formulation of the ARIMAX Model**
+
+The ARIMAX model can be expressed as:
+
+Yt = ARIMA(p,d,q)(P,D,Q)s + βX
+
+where:
+
+- Yt = confirmed malaria cases
+
+- Xt = vector of exogenous climatic variables
+
+- β = vector of regression coefficients
+
+- The ARIMA structure captures internal temporal dependence
+
+- Model validity is evaluated using:
+
+- Residual diagnostics
+
+- Ljung–Box test
+
+- Information criteria (AIC, BIC)
+
+- Comparative performance assessment
+
+## **Selection of Exogenous Variables**
+```{r}
+# Selection of exogenous variables
+xreg <- data[, c("Précipitation", "Température", "Humidité")]
+
+summary(xreg)  # Inspection
+xreg_scaled <- scale(xreg)  # Standardization
+
+```
+Standardization ensures that the estimated coefficients are comparable in magnitude and prevents scale-related estimation instability.
+
+
+
+## **Automatic ARIMAX Estimation**
+```{r}
+#Automatic ARIMAX
+model_arimax <- auto.arima(
+  ts_confirmed,
+  xreg = xreg_scaled,
+  seasonal = TRUE,
+  stepwise = FALSE,
+  approximation = FALSE
+)
+
+summary(model_arimax)
+```
+
+### **Interpretation of the ARIMAX Model**
+
+The ARIMAX model incorporates standardized climatic variables as explanatory covariates.
+
+Although some coefficients display signs consistent with established epidemiological findings, none appear strongly statistically significant.
+
+Furthermore, the information criterion for the ARIMAX model (AIC = 447.2) is substantially higher than that of the SARIMA model (AIC = 309.8), indicating that the inclusion of exogenous variables does not improve overall model fit.
+
+This suggests that seasonal structure alone captures most of the temporal variability in the series.
+
+
+
+## **Residual Diagnostics of the ARIMAX Model**
+```{r}
+#ARIMAX Diagnostics
+checkresiduals(model_arimax)
+```
+
+### **Interpretation of ARIMAX Diagnostics**
+
+Residual diagnostics indicate that the ARIMAX residuals behave as white noise. The Ljung–Box test yields a p-value of 0.98, suggesting no significant remaining autocorrelation.
+
+However, despite satisfactory residual diagnostics, the overall performance of the ARIMAX model remains inferior to that of the SARIMA model, limiting its predictive relevance in this context.
+
+
+
+
+# **Model Comparison: ARIMA vs SARIMA vs ARIMAX**
+
+To formally compare the competing models, information criteria are examined:
+
+_ Akaike Information Criterion (AIC)
+
+_ Bayesian Information Criterion (BIC)
+
+Lower values indicate a better balance between goodness-of-fit and model parsimony.
+```{r warning=FALSE}
+AIC(model_auto_no_seasonal, model_auto_seasonal, model_arimax)
+BIC(model_auto_no_seasonal, model_auto_seasonal, model_arimax)
+```
+
+## **Interpretation of Model Comparison**
+
+The comparison clearly demonstrates that the SARIMA model outperforms both the non-seasonal ARIMA and the ARIMAX models.
+
+The SARIMA model provides:
+
+- The lowest AIC and BIC values
+
+- A parsimonious structure
+ 
+- Adequate residual diagnostics
+
+- Explicit modelling of seasonal dynamics
+
+Therefore, the SARIMA specification represents the most appropriate model for forecasting confirmed malaria cases in this dataset.
+
+
+
+
+# **Forecasting Confirmed Malaria Cases (SARIMA Model)**
+
+Based on the SARIMA model identified as the best-performing specification, monthly forecasts of confirmed malaria cases are generated for the period 2025–2026.
+
+Forecasts are accompanied by 95% confidence intervals, which quantify the uncertainty associated with future projections.
+
+## **Forecast Generation**
+```{r}
+# Generate 24-month forecast (2025–2026)
+sarima_forecast <- forecast(
+  model_auto_seasonal,
+  h = 24,
+  level = 95
+)
+```
+
+## **Forecast Visualization**
+```{r}
+plot(
+  sarima_forecast,
+  main = "Forecast of Monthly Confirmed Malaria Cases Based on SARIMA Model",
+  xlab = "Year",
+  ylab = "Number of Confirmed Cases"
+)
+``` 
+
+## **Alternatively, using ggplot2**
+```{r}
+autoplot(sarima_forecast) +
+  labs(
+    title = "Forecast of Monthly Confirmed Malaria Cases (SARIMA)",
+    x = "Year",
+    y = "Number of Confirmed Cases"
+  ) +
+  theme_minimal()
+
+```
+
+### **Interpretation of Forecast Results**
+
+The monthly forecasts for 2025–2026 indicate the persistence of a seasonal pattern similar to that observed during the historical period (2022–2024).
+
+The predicted values continue to exhibit recurrent annual peaks, reflecting the strong seasonal structure captured by the SARIMA model.
+
+The confidence intervals widen progressively as the forecast horizon increases, which is expected in long-term forecasting contexts. This widening reflects the accumulation of uncertainty over time and highlights the inherent variability of epidemiological time series.
+
+Overall, the SARIMA model provides coherent and seasonally consistent projections of future confirmed malaria cases.
+
+
+
+
+# **Forecast Accuracy Evaluation**
+
+To assess the predictive performance of the selected model, an out-of-sample evaluation is conducted using a training/test split approach.
+
+This procedure consists of:
+
+- Estimating the model using a training period
+
+- Generating forecasts for a hold-out test period
+
+- Comparing predicted values with observed data
+
+This approach allows evaluation of model robustness and generalization capacity.
+
+
+## **Training and Test Split**
+```{r}
+# Training/test split
+train <- window(ts_confirmed, end = c(2023, 12))
+test  <- window(ts_confirmed, start = c(2024, 1))
+```
+The training sample includes data from January 2022 to December 2023, while the year 2024 is reserved for out-of-sample validation.
+
+
+## **Model Estimation on Training Data**
+```{r}
+model_train <- auto.arima(train, seasonal = TRUE)
+```
+The model is re-estimated using only the training period to ensure that forecasts for 2024 are genuinely out-of-sample.
+
+
+## **Out-of-Sample Forecasting**
+
+```{r}
+forecast_test <- forecast(model_train, h = length(test))
+```
+Forecasts are generated for the entire test period.
+
+
+## **Forecast Accuracy Metrics**
+The accuracy() function provides standard forecast performance measures, including:
+
+- RMSE (Root Mean Squared Error)
+
+-  (Mean Absolute Error)
+
+- MAPE (Mean Absolute Percentage Error)
+
+- Theil’s U statistic
+```{r}
+accuracy(forecast_test, test)
+```
+
+### **Interpretation of Forecast Performance**
+
+The out-of-sample evaluation indicates acceptable predictive performance, with moderate forecast errors and a Theil’s U statistic below 1.
+
+A Theil’s U value below 1 suggests that the model outperforms a naïve benchmark model, confirming its added predictive value.
+
+These results demonstrate that the SARIMA model possesses reasonable generalization capability and can be reliably used to support epidemiological surveillance and short-term planning.
+
+
+
+# **Conclusion and Public Health Implications**
+
+## **Conclusion**
+
+This study applied a structured time series modelling framework to monthly confirmed malaria cases observed between 2022 and 2024. Using the Box–Jenkins methodology, we systematically evaluated non-seasonal ARIMA, seasonal SARIMA, and ARIMAX models incorporating climatic covariates.
+
+The analysis revealed a pronounced and stable annual seasonal pattern in confirmed malaria cases. While the non-seasonal ARIMA model captured short-term temporal dependence, it failed to account for the strong seasonal structure. The SARIMA model significantly improved model fit, as evidenced by substantially lower AIC and BIC values, adequate residual diagnostics, and superior forecasting performance.
+
+The ARIMAX model, although theoretically motivated by the documented influence of climatic factors on malaria transmission, did not significantly improve predictive performance in this dataset. This suggests that the seasonal structure alone captured most of the temporal variability during the study period.
+
+Out-of-sample validation confirmed that the SARIMA model demonstrates reasonable generalization capacity and outperforms a naïve benchmark model.
+
+Overall, the SARIMA specification represents the most appropriate model for forecasting confirmed malaria cases in this context.
+
+
+
+## **Public Health Implications**
+
+The identification of strong annual seasonality in confirmed malaria cases has direct implications for epidemiological planning and resource allocation.
+
+First, the persistence of predictable seasonal peaks suggests that malaria prevention and control strategies should be intensified in advance of high-transmission periods. Forecast-informed planning may support:
+
+Strategic distribution of insecticide-treated nets (ITNs)
+
+Targeted indoor residual spraying campaigns
+
+Optimization of antimalarial drug stock management
+
+Reinforcement of community awareness campaigns before seasonal peaks
+
+Second, short-term forecasting tools based on SARIMA models can serve as early warning systems, assisting health authorities in anticipating increases in case burden and preventing healthcare system overload.
+
+Third, the limited added predictive value of climatic covariates in this specific dataset highlights the importance of local epidemiological structure. While climate is biologically relevant, its predictive contribution may vary depending on spatial scale, data resolution, and transmission intensity.
+
+Finally, integrating routine surveillance data with time series modelling approaches provides a cost-effective and scalable analytical framework for strengthening malaria monitoring systems in resource-constrained settings.
+
+
+
+## **Limitations and Future Directions**
+
+Several limitations should be acknowledged:
+
+The relatively short time horizon (three years) may limit detection of long-term structural changes.
+
+The analysis is based on aggregated monthly data, which may mask intra-month variability.
+
+Additional covariates such as vector density, intervention coverage, or socio-demographic factors were not incorporated.
+
+Future research could extend this framework by:
+
+- Applying multilevel or spatial time series models
+
+- Integrating higher-resolution climatic or entomological data
+
+- Exploring Bayesian time series approaches
+
+- Developing real-time early warning dashboards
+
+
+
+
+# **References**
+
+Brodersen, K. H., Gallusser, F., Koehler, J., Remy, N., & Scott, S. L. (2015). Inferring causal impact using Bayesian structural time-series models.Annals of Applied Statistics, 9(1), 247–274. https://doi.org/10.1214/14-AOAS788
+
+Gaubatz, K. T. (2014). A Survivor’s Guide to R: An Introduction for the Uninitiated and the Unnerved. SAGE Publications.
+
+Liboschik, T., Fokianos, K., & Fried, R. (2017). tscount: An R package for analysis of count time series following generalized linear models. Journal of Statistical Software, 82(1), 1–51. https://doi.org/10.18637/jss.v082.i05
+
+Righetti, N. (2025). Time Series Analysis With R. Available at: https://nicolarighetti.github.io/Time-Series-Analysis-With-R/
+
+Schaffer, A. L., Dobbins, T. A., & Pearson, S. A. (2021). Interrupted time series analysis using autoregressive integrated moving average (ARIMA) models: A guide for evaluating large-scale health interventions. BMC Medical Research Methodology, 21(1), 1–12. https://doi.org/10.1186/s12874-021-01306-2
+
+Shin, Y. (2017). Time Series Analysis in the Social Sciences: The Fundamentals. University of California Press.
+
+Wells, C., Shah, D. V., Pevehouse, J. C., Foley, J., Lukito, J., Pelled, A., & Yang, J. (2019). The temporal turn in communication research: Time series analyses using computational approaches. International Journal of Communication, 13, 19328036.
+
+Zivot, E., & Wang, J. (2003). Unit root tests. In Modeling Financial Time Series with S-Plus® (pp. 111–139). Springer. https://doi.org/10.1007/978-0-387-21763-5_4
