@@ -1003,3 +1003,19 @@ Shin, Y. (2017). Time Series Analysis in the Social Sciences: The Fundamentals. 
 Wells, C., Shah, D. V., Pevehouse, J. C., Foley, J., Lukito, J., Pelled, A., & Yang, J. (2019). The temporal turn in communication research: Time series analyses using computational approaches. International Journal of Communication, 13, 19328036.
 
 Zivot, E., & Wang, J. (2003). Unit root tests. In Modeling Financial Time Series with S-Plus® (pp. 111–139). Springer. https://doi.org/10.1007/978-0-387-21763-5_4
+
+
+
+
+
+# **Citation**
+
+If you use this analysis, please cite:
+
+Tchakondo, S. (2026).  
+*Time Series Analysis of Confirmed Malaria Cases Using ARIMA, SARIMA and ARIMAX Models.*  
+Zenodo. https://doi.org/10.5281/zenodo.18637204
+
+Source code available at:  
+https://github.com/Samadou-Tchakondo/malaria-time-series-analysis
+

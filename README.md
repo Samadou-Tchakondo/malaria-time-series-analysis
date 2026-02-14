@@ -83,17 +83,18 @@ rmarkdown::render("Time Series Analysis.Rmd")
 
 If you use this work, please cite:
 
-**TCHAKONDO, S. (2026).**
-*Time Series Analysis of Confirmed Malaria Cases Using ARIMA, SARIMA and ARIMAX Models.*
-SRM Institute of Science and Technology.
-Available at:
+Tchakondo, S. (2026).  
+*Time Series Analysis of Confirmed Malaria Cases Using ARIMA, SARIMA and ARIMAX Models.*  
+Zenodo. https://doi.org/10.5281/zenodo.18637204
+
+Source code available at:  
 https://github.com/Samadou-Tchakondo/malaria-time-series-analysis
 
 ---
 
 ## Author
 
-**Samadou TCHAKONDO**
+**Samadou Tchakondo**
 Biostatistician & Epidemiologist
 SRM Institute of Science and Technology, India
 ORCID: https://orcid.org/0009-0006-6747-3170
