@@ -260,7 +260,7 @@ First, an additive decomposition is applied to the monthly confirmed malaria cas
 The additive model assumes that the observed series can be expressed as:
  
               
-               Xt = Tt + St + Rt
+                                                Xt = Tt + St + Rt
                
 where:
 
@@ -300,7 +300,7 @@ Next, a multiplicative decomposition is performed to evaluate whether seasonal v
 
 In the multiplicative framework, the series is assumed to follow:
 
-                   Xt = Tt + St + Rt
+                                            Xt = Tt x St x Rt
                 
 
 Multiplicative decomposition is appropriate when seasonal fluctuations increase or decrease proportionally with the series level, implying heteroscedastic behavior.
@@ -324,6 +324,8 @@ The comparison between the two approaches suggests that the additive decompositi
 
 
 # **Stationarity and Temporal Dependence**
+
+After exploring the structural components of the series through decomposition, the next step of the Box–Jenkins methodology consists of formally assessing whether the stochastic process satisfies the stationarity assumption required for ARIMA-type modelling.
 
 Time series analysis relies on the fundamental assumption of stationarity. A time series is considered stationary when its key statistical properties remain constant over time. In practice, this implies:
 
@@ -352,31 +354,107 @@ Rejection of the null hypothesis at the conventional 5% significance level sugge
 adf.test(ts_confirmed)
 ```
 
-### **Interpretation of the ADF Test**
+### **Interpretation of the Augmented Dickey–Fuller (ADF) Test**
 
-The Augmented Dickey–Fuller test yields a test statistic of −3.56 with a p-value of 0.0499. At the 5% significance level, the null hypothesis of non-stationarity is rejected.
+The Augmented Dickey–Fuller test produced a test statistic of −3.56 with a p-value of 0.0499. At the conventional 5% significance level, the null hypothesis of a unit root (non-stationarity) is rejected, indicating that the series can be regarded as stationary in level.
 
-This result suggests that the series may be considered stationary in level. However, given that the rejection is marginal and strong annual seasonality has been observed, seasonal differencing remains methodologically justified when estimating SARIMA models.
+However, this statistical rejection is marginal and must be interpreted alongside the graphical analyses, which revealed a pronounced annual seasonal pattern in malaria incidence. In such contexts, the objective of seasonal differencing is not to correct non-stationarity per se, but to explicitly account for systematic periodic behaviour embedded in the data.
 
-
+Accordingly, no regular (non-seasonal) differencing was required, whereas seasonal differencing might be incorporated within the SARIMA framework to model the observed 12-month transmission cycle and improve the representation of recurring epidemiological dynamics.
 
 ## **Autocorrelation and Partial Autocorrelation Analysis**
 
-Beyond formal stationarity testing, examining the temporal dependence structure is a key step in the **Box–Jenkins methodology**.
+Beyond formal statistical tests of stationarity, examining the temporal dependence structure of the series constitutes a fundamental step in the Box–Jenkins modelling strategy. Once the time series has been rendered stationary (if required through differencing), the Autocorrelation Function (ACF) and Partial Autocorrelation Function (PACF) are analysed to guide the identification of appropriate ARIMA-type models.
 
-**- The Autocorrelation Function (ACF)** measures the correlation between observations and their past values at different lags.
 
-**- The Partial Autocorrelation Function (PACF)** measures correlation at a given lag after controlling for intermediate lags.
+### **Conceptual Role of ACF and PACF**
 
-Joint interpretation of the ACF and PACF helps to:
+**- Autocorrelation Function (ACF)**
 
-- Detect seasonal structure;
+Measures the correlation between observations and their lagged values across successive time intervals. It reflects both direct and indirect temporal relationships.
 
-- Identify autoregressive (AR) components;
+**- Partial Autocorrelation Function (PACF)**
 
-- Identify moving average (MA) components;
+Measures the correlation between observations at a specific lag after removing the influence of intermediate lags. It therefore isolates the direct dependence structure.
 
-- Guide ARIMA and SARIMA model specification.
+**The joint interpretation of ACF and PACF enables:**
+
+- Identification of autoregressive (AR) components;
+
+- Identification of moving average (MA) components;
+
+- Detection of seasonal dependence;
+
+- Specification of candidate ARIMA/SARIMA models.
+
+
+
+### **Theoretical Identification Rules (Box–Jenkins Framework)**
+
+Table 1. The Box–Jenkins methodology provides well-established diagnostic patterns linking ACF/PACF behaviour to the underlying stochastic process
+
+
+| Pattern                                   | ACF Behaviour        | PACF Behaviour      | Suggested Model |
+|-------------------------------------------|----------------------|---------------------|-----------------|
+| ACF tails off + PACF cuts off at lag *p*  | Gradual decay        | Sharp cutoff        | AR(*p*)         |
+| ACF cuts off at lag *q* + PACF tails off  | Sharp cutoff         | Gradual decay       | MA(*q*)         |
+| Both ACF and PACF tail off                | Gradual decay in both| No clear cutoff     | ARMA(*p,q*)     |      |
+
+
+These patterns allow an initial empirical identification before parameter estimation.
+
+
+## **Statistical Rationale for These Patterns**
+
+**- Autoregressive Process AR(p)**
+
+An autoregressive process of order p is defined as:
+
+                                   Yt = ϕ1Yt−1 +ϕ2Yt−2 +⋯+ ϕpYt−p + εt
+
+Each observation depends directly on its previous values.
+
+**Implications:**
+
+- Information propagates through time, generating correlations at many lags.
+
+- The ACF declines gradually (tailing-off pattern).
+
+- The PACF shows a sharp cutoff at lag 
+p because it removes indirect effects.
+
+The PACF therefore identifies the true autoregressive order.
+
+
+
+**- Moving Average Process MA(q)**
+
+A moving average process of order q is expressed as:
+
+                                        Yt = εt+ θ1εt−1 +⋯+ θqεt−q
+
+**Implications:**
+
+- Correlation disappears after lag q.
+
+- The ACF cuts off sharply at lag q.
+
+- The PACF decays gradually, approximating an autoregressive representation.
+
+The ACF identifies the order of the MA component.
+
+
+
+**- Mixed ARMA Processes**
+
+When both AR and MA components are present:
+
+- Neither ACF nor PACF exhibits a clean cutoff;
+
+- Both functions display gradual decay.
+
+This behaviour indicates a combined dependence structure, commonly observed in real-world epidemiological time series where persistence and random shocks coexist.
+
 ```{r}
 #ACF & PACF
 par(mfrow = c(1,2))
@@ -386,18 +464,19 @@ Pacf(ts_confirmed, main = "PACF of Original Series")
 
 ### **Interpretation of ACF and PACF**
 
-The ACF exhibits a gradual decay and prominent spikes at lags that are multiples of 12, indicating strong annual seasonal dependence.
+The ACF and PACF were examined directly on the observed monthly malaria incidence series as part of the exploratory phase of the Box–Jenkins methodology. No prior transformation was applied, as the variance appeared reasonably stable over time.
 
-The PACF shows a relatively sharp cutoff after the first few lags, suggesting limited short-term autoregressive structure.
+The ACF exhibits a gradual decay along with notable spikes at lags corresponding to multiples of 12, indicating a strong annual seasonal dependence typical of epidemiological data with recurring transmission cycles.
 
-This pattern is consistent with:
+The PACF shows a more pronounced contribution at the first few lags, followed by a rapid attenuation, suggesting limited short-term autoregressive structure once the primary dependence is accounted for.
 
-- A non-seasonal moving average component;
+This joint behaviour is consistent with:
 
-- A seasonal autoregressive component;
+The presence of a non-seasonal moving-average component capturing short-term shock propagation;
 
-These findings support the consideration of SARIMA models incorporating seasonal dynamics.
+A seasonal autoregressive structure reflecting persistence of malaria transmission from one year to the next.
 
+These empirical observations motivated the consideration of SARIMA models that explicitly incorporate seasonal dynamics, which were subsequently evaluated using automated selection procedures and diagnostic criteria.
 
 
 ## **Lag-1 Scatterplot**
@@ -475,7 +554,7 @@ Model Notation
 
 An ARIMA model is written as:
 
-                 ARIMA(p,d,q)
+                                                     ARIMA(p,d,q)
 
 where:
 
@@ -499,6 +578,8 @@ It provides a comparison benchmark for more complex models such as SARIMA and AR
 ## **Non-Seasonal ARIMA Model (Baseline)**
 
 The non-seasonal ARIMA model is estimated automatically using information criteria to determine the optimal combination of autoregressive, differencing, and moving average terms.
+
+Automatic model selection was performed using auto.arima() with stepwise = FALSE and approximation = FALSE to ensure an exhaustive search and exact maximum likelihood estimation, thereby improving the robustness and reproducibility of model identification.
 ```{r}
 # Non-seasonal ARIMA model
 model_auto_no_seasonal <- auto.arima(
@@ -554,7 +635,7 @@ hist(model_auto_no_seasonal$residuals,
 
 Residual diagnostics indicate no significant residual autocorrelation.
 
-The Ljung–Box test yields a p-value of 0.66, suggesting that the residuals do not significantly deviate from white noise behavior.
+The Ljung–Box test is used to check whether residuals from a fitted time series model are independent (i.e., no remaining autocorrelation). The Ljung–Box test yields a p-value of 0.66, suggesting that the residuals do not significantly deviate from white noise behavior.
 
 Therefore, from a statistical standpoint, the model appears adequately specified.
 
@@ -586,7 +667,7 @@ After estimation, residual diagnostics are examined to verify the overall adequa
 
 A SARIMA model is denoted as:
 
-             SARIMA(p,d,q)(P,D,Q)s
+                                                  SARIMA(p,d,q)(P,D,Q)s
 
 where:
 
@@ -621,7 +702,7 @@ summary(model_auto_seasonal)
 
 The automatically selected model is:
 
-            SARIMA(0,0,1)(1,1,0)12
+                                               SARIMA(0,0,1)(1,1,0)12
             
 This specification includes:
 
@@ -811,9 +892,10 @@ Therefore, the SARIMA specification represents the most appropriate model for fo
 
 
 
+
 # **Forecasting Confirmed Malaria Cases (SARIMA Model)**
 
-Based on the SARIMA model identified as the best-performing specification, monthly forecasts of confirmed malaria cases are generated for the period 2025–2026.
+Based on the SARIMA model identified as the best-performing specification, monthly forecasts of confirmed malaria cases were generated for the period 2025-2026.
 
 Forecasts are accompanied by 95% confidence intervals, which quantify the uncertainty associated with future projections.
 
@@ -824,6 +906,32 @@ sarima_forecast <- forecast(
   model_auto_seasonal,
   h = 24,
   level = 95
+)
+```
+
+## **Extraction of Forecasted Values**
+
+To support quantitative interpretation, forecasted values and their confidence intervals were extracted into a structured table.
+```{r}
+forecast_table <- data.frame(
+  Date = seq(as.Date("2025-01-01"), by = "month", length.out = 24),
+  Forecast = as.numeric(sarima_forecast$mean),
+  Lower_95 = as.numeric(sarima_forecast$lower[,1]),
+  Upper_95 = as.numeric(sarima_forecast$upper[,1])
+)
+```
+
+## **Tabular Presentation of Forecasts**
+
+The forecasted monthly values of confirmed malaria cases for the period 2025–2026 are presented in Table.
+
+This tabular representation provides the point estimates together with their corresponding 95% confidence intervals, allowing a precise numerical assessment of the expected disease burden and the uncertainty surrounding the projections. Such presentation facilitates interpretation, comparison across months, and potential use in public health planning and resource allocation
+
+```{r}
+knitr::kable(
+  forecast_table,
+  digits = 0,
+  caption = "Table 2. presents the forecasted monthly values of confirmed malaria cases for the period 2025-2026, together with their corresponding 95% confidence intervals."
 )
 ```
 
@@ -849,16 +957,27 @@ autoplot(sarima_forecast) +
 
 ```
 
-### **Interpretation of Forecast Results**
+## **Export of Forecast Results**
 
-The monthly forecasts for 2025–2026 indicate the persistence of a seasonal pattern similar to that observed during the historical period (2022–2024).
+The forecasted values were exported as a structured dataset in CSV format to enable external use, further statistical analysis, and integration into reporting or public health decision-support tools.
+This export ensures that the numerical projections can be easily shared, archived, and reused in other analytical environments while maintaining reproducibility of the forecasting process.
+```{r}
+write.csv(
+  forecast_table,
+  "output/malaria_forecasts_2025_2026.csv",
+  row.names = FALSE
+)
+```
 
-The predicted values continue to exhibit recurrent annual peaks, reflecting the strong seasonal structure captured by the SARIMA model.
+## **Interpretation of Forecast Results**
 
-The confidence intervals widen progressively as the forecast horizon increases, which is expected in long-term forecasting contexts. This widening reflects the accumulation of uncertainty over time and highlights the inherent variability of epidemiological time series.
+The forecasts for the period 2025–2026 indicate the persistence of a seasonal pattern consistent with that observed during the historical period (2022–2024). Predicted values continue to display recurrent annual peaks, demonstrating that the SARIMA model successfully captures the underlying seasonal transmission dynamics of malaria.
 
-Overall, the SARIMA model provides coherent and seasonally consistent projections of future confirmed malaria cases.
+The forecast uncertainty increases progressively with the prediction horizon, as reflected by the widening confidence intervals. This behaviour is expected in time series forecasting and reflects the accumulation of uncertainty over time as predictions extend further from the observed data.
 
+The numerical forecast estimates corroborate the graphical projections, with anticipated mid-year peaks aligning with historically observed malaria transmission cycles.
+
+Overall, the SARIMA model provides coherent, epidemiologically plausible, and seasonally consistent projections of future confirmed malaria cases, supporting its suitability for short-term surveillance and planning purposes.
 
 
 
@@ -906,7 +1025,7 @@ The accuracy() function provides standard forecast performance measures, includi
 
 - RMSE (Root Mean Squared Error)
 
--  (Mean Absolute Error)
+- MAE (Mean Absolute Error)
 
 - MAPE (Mean Absolute Percentage Error)
 
@@ -988,7 +1107,7 @@ Future research could extend this framework by:
 
 # **References**
 
-Brodersen, K. H., Gallusser, F., Koehler, J., Remy, N., & Scott, S. L. (2015). Inferring causal impact using Bayesian structural time-series models.Annals of Applied Statistics, 9(1), 247–274. https://doi.org/10.1214/14-AOAS788
+Brodersen, K. H., Gallusser, F., Koehler, J., Remy, N., & Scott, S. L. (2015). Inferring causal impact using Bayesian structural time-series models. Annals of Applied Statistics, 9(1), 247–274. https://doi.org/10.1214/14-AOAS788
 
 Gaubatz, K. T. (2014). A Survivor’s Guide to R: An Introduction for the Uninitiated and the Unnerved. SAGE Publications.
 

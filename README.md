@@ -1,4 +1,5 @@
 # Time Series Analysis of Confirmed Malaria Cases Using ARIMA, SARIMA and ARIMAX Models
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18637204.svg)](https://doi.org/10.5281/zenodo.18637204)
 
 ## Overview
 
